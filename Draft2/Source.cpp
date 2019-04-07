@@ -8,28 +8,35 @@
 #include <vector>
 #include <map>
 #include "sha256.h"
+#include <cctype>
 using namespace std;
 
-struct Record {string id;
+struct Record {
+	string id;
 	string site;
 	string user;
 	string pass;
 };
 
+bool isFirstRun();
 void PopulateVector(vector<Record> &vRecords);
 void ResizeEntry(string &entry, int maxWidth);
+void MainMenu(vector<Record>& vRecords);
 void UpdateDatabase(vector<Record> &vRecords);
 void DisplayRecords(vector<Record> &vRecords);
 void FirstRunMenu(vector<Record> &vRecords);
-void DeleteRecord(vector<Record> &vRecords);
+
 void PromptForMasterPassword(string &hash);
+
+/* CRUD */
 void ViewRecord(vector<Record> &vRecords);
+void AddRecord(vector<Record>& vRecords);
 void EditRecord(vector<Record> &vRecords);
-void AddRecord(vector<Record> &vRecords);
-void MainMenu(vector<Record> &vRecords);
+void DeleteRecord(vector<Record>& vRecords);
+
+/*Cryptography*/
 void WriteHashToKeyFile(string &key);
 string CreateMasterPassword();
-bool isFirstRun();
 string GetInput();
 string GetHash();
 
@@ -37,7 +44,7 @@ int main()
 {
 	if (isFirstRun())
 	{
-		cout << "Welcome to Password Manager.\nPlease begin by creating a master password.\n";
+		cout << "Welcome to Password Manager.\n Please begin by creating a master password.\n";
 		WriteHashToKeyFile(CreateMasterPassword());
 
 		cout << "Press ENTER to start storing your passwords securely.";
@@ -52,6 +59,49 @@ int main()
 	DisplayRecords(Records);
 
 	return 0;
+}
+
+
+/* CRUD */
+void ViewRecord(vector<Record>& vRecords)
+{
+	string searchString;
+	bool recordExists = false;
+
+	cout << "=======================================================================================================================\n";
+	cout << "|                                                 View Record                                                         |\n";
+	cout << "=======================================================================================================================\n";
+
+	while (!recordExists)
+	{
+		cout << "Select a record to view: ";
+		getline(cin, searchString);
+
+		for (unsigned i = 0; i < vRecords.size(); ++i)
+		{
+			Record& rec = vRecords[i];
+
+			if (searchString.compare((rec.id)) == 0)
+			{
+				recordExists = true;
+				cout << "Record " << (rec.id) << " is Selected.\n";
+
+				cout << "website: " << rec.site << "\n"
+					<< "username/email: " << rec.user << "\n"
+					<< "password: " << rec.pass << "\n";
+
+				break;
+			}
+		}
+	}
+
+	for (unsigned i = 0; i < vRecords.size(); i++)
+	{
+		Record& r = vRecords[i];
+		r.id = to_string(i + 1);
+	}
+
+	DisplayRecords(vRecords);
 }
 
 void EditRecord(vector<Record> &vRecords)
@@ -98,7 +148,7 @@ void EditRecord(vector<Record> &vRecords)
 
 void AddRecord(vector<Record> &vRecords)
 {
-	//system("cls");
+	
 	cout << "=======================================================================================================================\n";
 	cout << "|                                                  Add Record                                                         |\n";
 	cout << "=======================================================================================================================\n";
@@ -106,6 +156,7 @@ void AddRecord(vector<Record> &vRecords)
 	string title;
 	string username;
 	string password;
+	string confirmPassword;
 
 	cout << "Title: ";
 	getline(cin, title);
@@ -113,19 +164,68 @@ void AddRecord(vector<Record> &vRecords)
 	getline(cin, username);
 	cout << "Password: ";
 	getline(cin, password);
+	cout << "Confirm Password: ";
+	getline(cin, confirmPassword);
 
-	Record rec;
-	rec.site = title;
-	rec.user = username;
-	rec.pass = password;
+	// only if the confirm pass word and password match will the record be added.
+	if (password == confirmPassword)
+	{
+		Record rec;
+		rec.site = title;
+		rec.user = username;
+		rec.pass = password;
 
-	vRecords.push_back(rec);
-	
+		vRecords.push_back(rec);
+
+		for (unsigned i = 0; i < vRecords.size(); i++)
+		{
+			Record& r = vRecords[i];
+			r.id = to_string(i + 1);
+		}
+	}
+	DisplayRecords(vRecords);
+}
+
+void DeleteRecord(vector<Record>& vRecords)
+{
+	string searchString;
+	string check;
+	bool recordExists = false;
+
+	cout << "=======================================================================================================================\n";
+	cout << "|                                                 Delete Record                                                       |\n";
+	cout << "=======================================================================================================================\n";
+
+	while (!recordExists)
+	{
+		cout << "Select a record to delete: ";
+		getline(cin, searchString);
+
+		for (unsigned i = 0; i < vRecords.size(); ++i)
+		{
+			Record& rec = vRecords[i];
+
+			if (searchString.compare((rec.id)) == 0)
+			{
+				recordExists = true;
+				cout << "Please confirm with yes to delete. Record: " << rec.id << "\n";
+				getline(cin, check);
+				if (check == "yes")
+				{
+					cout << "Record " << (rec.id) << " is deleted.\n";
+					vRecords.erase(vRecords.begin() + i);
+
+					break;
+				}
+			}
+		}
+	}
+
 	for (unsigned i = 0; i < vRecords.size(); i++)
 	{
-		Record &r = vRecords[i];
+		Record& r = vRecords[i];
 		r.id = to_string(i + 1);
-	}	
+	}
 
 	DisplayRecords(vRecords);
 }
@@ -267,6 +367,9 @@ string CreateMasterPassword()
 	return masterPassword;
 }
 
+/*
+	if key.txt exists return false
+*/
 bool isFirstRun()
 {
 	bool result = true;
@@ -352,85 +455,8 @@ void FirstRunMenu(vector<Record> &vRecords)
 	FirstRunMenuTable.at(input).action();
 }
 
-void DeleteRecord(vector<Record> &vRecords)
-{
-	string searchString;
-	bool recordExists = false;
 
-	cout << "=======================================================================================================================\n";
-	cout << "|                                                 Delete Record                                                       |\n";
-	cout << "=======================================================================================================================\n";
 
-	while (!recordExists)
-	{
-		cout << "Select a record to delete: ";
-		getline(cin, searchString);
-
-		for (unsigned i = 0; i < vRecords.size(); ++i)
-		{
-			Record &rec = vRecords[i];
-
-			if (searchString.compare((rec.id)) == 0)
-			{
-				recordExists = true;
-				cout << "Record " << (rec.id) << " is Selected.\n";
-				
-				vRecords.erase(vRecords.begin() + i);
-
-				break;
-			}
-		}
-	}
-
-	for (unsigned i = 0; i < vRecords.size(); i++)
-	{
-		Record &r = vRecords[i];
-		r.id = to_string(i + 1);
-	}
-
-	DisplayRecords(vRecords);
-}
-
-void ViewRecord(vector<Record> &vRecords)
-{
-	string searchString;
-	bool recordExists = false;
-
-	cout << "=======================================================================================================================\n";
-	cout << "|                                                 View Record                                                         |\n";
-	cout << "=======================================================================================================================\n";
-
-	while (!recordExists)
-	{
-		cout << "Select a record to view: ";
-		getline(cin, searchString);
-
-		for (unsigned i = 0; i < vRecords.size(); ++i)
-		{
-			Record &rec = vRecords[i];
-
-			if (searchString.compare((rec.id)) == 0)
-			{
-				recordExists = true;
-				cout << "Record " << (rec.id) << " is Selected.\n";
-
-				cout << "website: " << rec.site << "\n"
-					<< "username/email: " << rec.user << "\n"
-					<< "password: " << rec.pass << "\n";
-
-				break;
-			}
-		}
-	}
-
-	for (unsigned i = 0; i < vRecords.size(); i++)
-	{
-		Record &r = vRecords[i];
-		r.id = to_string(i + 1);
-	}
-
-	DisplayRecords(vRecords);
-}
 
 void UpdateDatabase(vector<Record> &vRecords)
 {	
