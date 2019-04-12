@@ -11,6 +11,9 @@
 #include <cctype>
 using namespace std;
 
+// Acceptable characters to be used in the password generation
+static const char alphnum[] = "0123456789" "!@#$%^&*" "ABCDEFGHIJKLMNOPQRSTUVWXYZ" "abcdefghijklmnopqrstuvwxyz";
+
 struct Record {
 	string id;
 	string site;
@@ -39,6 +42,8 @@ void WriteHashToKeyFile(string &key);
 string CreateMasterPassword();
 string GetInput();
 string GetHash();
+char GenRand();
+string GenPassword();
 
 int main()
 {
@@ -153,15 +158,21 @@ void AddRecord(vector<Record> &vRecords)
 	cout << "|                                                  Add Record                                                         |\n";
 	cout << "=======================================================================================================================\n";
 
-	string title;
-	string username;
-	string password;
-	string confirmPassword;
+	string title, username, password, confirmPassword, choice;
+	
 
 	cout << "Title: ";
 	getline(cin, title);
 	cout << "Username: ";
 	getline(cin, username);
+	cout << "Would you like to generate a password? Type 'YES' if so otherwise press enter. \n";
+	getline(cin, choice);
+	
+	if (choice == "YES") 
+	{
+		cout << "Your Password is:" << GenPassword() << endl;
+	}
+
 	cout << "Password: ";
 	getline(cin, password);
 	cout << "Confirm Password: ";
@@ -249,13 +260,14 @@ void MainMenu(vector<Record> &vRecords) {
 		function<void()> action;
 	};
 
-	const map <string, MenuAction> actionTable{
+	const map <string, MenuAction> actionTable {
 
 		{ "1",{ "View Record", [&]() { ViewRecord(vRecords); } } },
 		{ "2",{ "Add Record", [&]() { AddRecord(vRecords); } } },
 		{ "3",{ "Edit Record", [&]() { EditRecord(vRecords); } } },
 		{ "4",{ "Delete Record", [&]() { DeleteRecord(vRecords); } } },
-		{ "q",{ "Quit", [&]() { UpdateDatabase(vRecords); } } }
+		{ "s",{ "Save and exit", [&]() { UpdateDatabase(vRecords); } } },
+		{ "q",{ "Quit", [&]() { exit(0); } } }
 	};
 
 	for (auto const& x : actionTable) {
@@ -382,7 +394,9 @@ bool isFirstRun()
 
 	return result;
 }
-
+/*
+	Simple formatting
+*/
 void ResizeEntry(string &entry, int colWidth) {
 
 	unsigned allowedStringSize = (colWidth - 5);
@@ -469,6 +483,43 @@ void UpdateDatabase(vector<Record> &vRecords)
 		Record &rec = vRecords[i];
 		outFile << rec.id << "\t" << rec.site << "\t" << rec.user << "\t" << rec.pass << "\n";
 	}
+}
+
+//void encryptDecrypt(vector<Record>& vRecords) {}
+
+
+char GenRand()
+{
+	int strLen = sizeof(alphnum) - 1;
+	return alphnum[rand() % strLen];
+}
+
+string GenPassword() 
+{
+	int n, c = 0, s = 0;
+	string password;
+	srand(time(0));
+	cout << "Enter the length of the password required:";
+	cin >> n;
+
+
+	char C;
+	
+	for (int z = 0; z < n; z++)
+	{
+		C = GenRand();
+		password += C;
+		if (isdigit(C))
+		{
+			c++;
+		}
+		if (C == '!' || C == '@' || C == '$' || C == '%' || C == '^' || C == '&' || C == '*' || C == '#')
+		{
+			s++;
+		}
+	}
+
+	return password;
 }
 
 /*
