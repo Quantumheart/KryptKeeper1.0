@@ -9,6 +9,8 @@
 #include <map>
 #include "sha256.h"
 #include <cctype>
+#include <windows.h>
+
 using namespace std;
 
 // Acceptable characters to be used in the password generation
@@ -28,7 +30,7 @@ void MainMenu(vector<Record>& vRecords);
 void UpdateDatabase(vector<Record> &vRecords);
 void DisplayRecords(vector<Record> &vRecords);
 void FirstRunMenu(vector<Record> &vRecords);
-
+string encryptDecrypt(string toEncrypt);
 void PromptForMasterPassword(string &hash);
 
 /* CRUD */
@@ -175,7 +177,7 @@ void AddRecord(vector<Record> &vRecords)
 
 	cout << "Password: ";
 	getline(cin, password);
-	cout << "Confirm Password: ";
+	cout << "\nConfirm Password: ";
 	getline(cin, confirmPassword);
 
 	// only if the confirm pass word and password match will the record be added.
@@ -343,6 +345,12 @@ void WriteHashToKeyFile(string &key)
 {
 	SHA256 sha256;
 	ofstream outFile("key.txt");
+	wchar_t* fileLPCWSTR = L"key.txt";
+
+	int attr = GetFileAttributes(fileLPCWSTR);
+	if ((attr & FILE_ATTRIBUTE_HIDDEN) == 0) {
+		SetFileAttributes(fileLPCWSTR, attr | FILE_ATTRIBUTE_HIDDEN);
+	}
 	outFile << sha256(key);
 }
 
@@ -477,15 +485,33 @@ void UpdateDatabase(vector<Record> &vRecords)
 	ofstream outFile;
 	outFile.open("database.txt", ios_base::app);
 	
+	wchar_t* fileLPCWSTR = L"database.txt";
+
+	int attr = GetFileAttributes(fileLPCWSTR);
+	if ((attr & FILE_ATTRIBUTE_HIDDEN) == 0) {
+		SetFileAttributes(fileLPCWSTR, attr | FILE_ATTRIBUTE_HIDDEN);
+	}
 
 	for (unsigned i = 0; i < vRecords.size(); ++i)
 	{
 		Record &rec = vRecords[i];
-		outFile << rec.id << "\t" << rec.site << "\t" << rec.user << "\t" << rec.pass << "\n";
+		
+		// encryption goes here
+		outFile << rec.id << "\t" << encryptDecrypt(rec.site) << "\t" << encryptDecrypt(rec.user) << "\t" << encryptDecrypt(rec.pass) << "\n";
+		
 	}
 }
 
-//void encryptDecrypt(vector<Record>& vRecords) {}
+string encryptDecrypt(string toEncrypt) 
+{
+	char key[3] = { 'P', 'C', 'K' };
+	string output;
+
+	for (int i = 0; i < toEncrypt.size(); i++)
+		output += toEncrypt[i] ^ key[i % (sizeof(key) / sizeof(char))];
+		
+	return output;
+}
 
 
 char GenRand()
