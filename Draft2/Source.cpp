@@ -9,42 +9,58 @@
 #include <map>
 #include "sha256.h"
 #include <cctype>
+#include <windows.h>
+
 using namespace std;
+
+// Acceptable characters to be used in the password generation
+static const char alphnum[] = "0123456789" "!@#$%^&*" "ABCDEFGHIJKLMNOPQRSTUVWXYZ" "abcdefghijklmnopqrstuvwxyz";
 
 struct Record {
 	string id;
-	string site;
+	string description;
 	string user;
 	string pass;
 };
 
-bool isFirstRun();
-void PopulateVector(vector<Record> &vRecords);
-void ResizeEntry(string &entry, int maxWidth);
-void MainMenu(vector<Record>& vRecords);
-void UpdateDatabase(vector<Record> &vRecords);
-void DisplayRecords(vector<Record> &vRecords);
-void FirstRunMenu(vector<Record> &vRecords);
+void Title();
+void DeleteRecordBanner();
+void AddRecordBanner();
+void ViewRecordBanner();
+void EditRecordsBanner();
+void RecordsBanner();
+bool databaseExists();
 
-void PromptForMasterPassword(string &hash);
+bool isFirstRun();
+void PopulateVector(vector<Record>& vRecords);
+void ResizeEntry(string& entry, int maxWidth);
+void MainMenu(vector<Record>& vRecords);
+void UpdateDatabase(vector<Record>& vRecords);
+void DisplayRecords(vector<Record>& vRecords);
+void FirstRunMenu(vector<Record>& vRecords);
+void PromptForMasterPassword(string& hash);
 
 /* CRUD */
-void ViewRecord(vector<Record> &vRecords);
+void ViewRecord(vector<Record>& vRecords);
 void AddRecord(vector<Record>& vRecords);
-void EditRecord(vector<Record> &vRecords);
+void EditRecord(vector<Record>& vRecords);
 void DeleteRecord(vector<Record>& vRecords);
 
 /*Cryptography*/
-void WriteHashToKeyFile(string &key);
+void Krypt();
+void WriteHashToKeyFile(string& key);
 string CreateMasterPassword();
 string GetInput();
 string GetHash();
+char GenRand();
+string GenPassword();
 
 int main()
 {
 	if (isFirstRun())
 	{
-		cout << "Welcome to Password Manager.\n Please begin by creating a master password.\n";
+		Title();
+		cout << "Welcome to KryptKeeper.\nPlease begin by creating a master password.\n";
 		WriteHashToKeyFile(CreateMasterPassword());
 
 		cout << "Press ENTER to start storing your passwords securely.";
@@ -52,30 +68,45 @@ int main()
 	}
 
 	PromptForMasterPassword(GetHash());
-
 	vector<Record> Records;
 
-	PopulateVector(Records);
-	DisplayRecords(Records);
+	if (!databaseExists())
+	{
+		FirstRunMenu(Records);
+	}
+
+	else
+	{
+		Krypt();
+		PopulateVector(Records);
+		Krypt();
+	}
+
+	MainMenu(Records);
 
 	return 0;
 }
 
-
 /* CRUD */
 void ViewRecord(vector<Record>& vRecords)
 {
+	system("cls");
+	Title();
+	ViewRecordBanner();
+	DisplayRecords(vRecords);
+
 	string searchString;
 	bool recordExists = false;
-
-	cout << "=======================================================================================================================\n";
-	cout << "|                                                 View Record                                                         |\n";
-	cout << "=======================================================================================================================\n";
 
 	while (!recordExists)
 	{
 		cout << "Select a record to view: ";
 		getline(cin, searchString);
+
+		if (searchString == "c")
+		{
+			MainMenu(vRecords);
+		}
 
 		for (unsigned i = 0; i < vRecords.size(); ++i)
 		{
@@ -84,11 +115,10 @@ void ViewRecord(vector<Record>& vRecords)
 			if (searchString.compare((rec.id)) == 0)
 			{
 				recordExists = true;
-				cout << "Record " << (rec.id) << " is Selected.\n";
-
-				cout << "website: " << rec.site << "\n"
-					<< "username/email: " << rec.user << "\n"
-					<< "password: " << rec.pass << "\n";
+				cout << "Record " << (rec.id) << " is Selected.\n\n";
+				cout << "Description: " << rec.description << "\n"
+					<< "Username: " << rec.user << "\n"
+					<< "Password: " << rec.pass << "\n";
 
 				break;
 			}
@@ -101,17 +131,21 @@ void ViewRecord(vector<Record>& vRecords)
 		r.id = to_string(i + 1);
 	}
 
-	DisplayRecords(vRecords);
+	cout << "\nPress ENTER to continue\n";
+	cin.ignore();
+
+	MainMenu(vRecords);
 }
 
-void EditRecord(vector<Record> &vRecords)
+void EditRecord(vector<Record> & vRecords)
 {
+	system("cls");
+	Title();
+	EditRecordsBanner();
+	DisplayRecords(vRecords);
+
 	string searchString;
 	bool recordExists = false;
-
-	cout << "=======================================================================================================================\n";
-	cout << "|                                                 Edit Record                                                         |\n";
-	cout << "=======================================================================================================================\n";
 
 	while (!recordExists)
 	{
@@ -120,86 +154,206 @@ void EditRecord(vector<Record> &vRecords)
 
 		for (unsigned i = 0; i < vRecords.size(); ++i)
 		{
-			Record &rec = vRecords[i];
+			Record& rec = vRecords[i];
 
 			if (searchString.compare((rec.id)) == 0)
 			{
 				recordExists = true;
-				cout << "Record " << (rec.id) << " is Selected.\n";
+				cout << "Record " << (rec.id) << " is Selected.\n\n";
+				cout << "Description: " << rec.description << "\n"
+					<< "Username: " << rec.user << "\n"
+					<< "Password: " << rec.pass << "\n";
 
-				string username;
-				string password;
+				bool isEditFinished = false;
 
-				cout << "Username: ";
-				getline(cin, username);
-				cout << "Password: ";
-				getline(cin, password);
+				while (!isEditFinished)
+				{
+					bool isValidOption = false;
 
-				rec.user = username;
-				rec.pass = password;
+					string newDescription;
+					string newUserName;
+					string newPassword;
+					string option;
+					string finished;
+
+					cout << "\nWhat would you like to edit?\n";
+					cout << "1. Description\n";
+					cout << "2. Username\n";
+					cout << "3. Password\n";
+					cout << "c. Cancel\n";
+
+					while (!isValidOption)
+					{
+						cout << ">> ";
+						getline(cin, option);
+
+						if (option == "1")
+						{
+							isValidOption = true;
+							cout << "Description: ";
+							getline(cin, newDescription);
+
+							if (newDescription == "c")
+							{
+								MainMenu(vRecords);
+							}
+
+							rec.description = newDescription;
+							cout << "Are you finished editing this record? [y/n]\n";
+							cout << ">> ";
+							getline(cin, finished);
+
+							if (finished == "y")
+							{
+								isEditFinished = true;
+								break;
+							}
+						}
+
+						if (option == "2")
+						{
+							isValidOption = true;
+							cout << "Username: ";
+							getline(cin, newUserName);
+
+							if (newUserName == "c")
+							{
+								break;
+							}
+
+							rec.user = newUserName;
+							cout << "Are you finished editing this record? [y/n]\n";
+							cout << ">> ";
+							getline(cin, finished);
+
+							if (finished == "y")
+							{
+								isEditFinished = true;
+								break;
+							}
+						}
+
+						if (option == "3")
+						{
+							isValidOption = true;
+							cout << "Password: ";
+							getline(cin, newPassword);
+
+							if (newPassword == "c")
+							{
+								break;
+							}
+
+							rec.pass = newPassword;
+							cout << "Are you finished editing this record? [y/n]\n";
+							cout << ">> ";
+							getline(cin, finished);
+
+							if (finished == "y")
+							{
+								isEditFinished = true;
+								break;
+							}
+						}
+
+						if (option == "c")
+						{
+							isValidOption = true;
+							MainMenu(vRecords);
+						}
+					}
+				}
 
 				break;
+			}
+
+			if (searchString == "c")
+			{
+				MainMenu(vRecords);
 			}
 		}
 	}
 
-	DisplayRecords(vRecords);
+	MainMenu(vRecords);
 }
 
-void AddRecord(vector<Record> &vRecords)
+void AddRecord(vector<Record> & vRecords)
 {
-	
-	cout << "=======================================================================================================================\n";
-	cout << "|                                                  Add Record                                                         |\n";
-	cout << "=======================================================================================================================\n";
+	system("cls");
+	Title();
+	AddRecordBanner();
 
-	string title;
-	string username;
-	string password;
-	string confirmPassword;
+	string description, username, password, confirmPassword, choice;
 
-	cout << "Title: ";
-	getline(cin, title);
+	cout << "Description: ";
+	getline(cin, description);
 	cout << "Username: ";
 	getline(cin, username);
-	cout << "Password: ";
-	getline(cin, password);
-	cout << "Confirm Password: ";
-	getline(cin, confirmPassword);
+	cout << "Would you like to generate a password? Type 'YES' if so otherwise press enter.";
+	getline(cin, choice);
 
-	// only if the confirm pass word and password match will the record be added.
-	if (password == confirmPassword)
+	if (choice == "YES")
 	{
-		Record rec;
-		rec.site = title;
-		rec.user = username;
-		rec.pass = password;
+		cout << "Your Password is: " << GenPassword() << endl;
+	}
 
-		vRecords.push_back(rec);
+	bool isValidPassword = false;
 
-		for (unsigned i = 0; i < vRecords.size(); i++)
+	while (!isValidPassword)
+	{
+		cout << "Password: ";
+		getline(cin, password);
+		cout << "Confirm Password: ";
+		getline(cin, confirmPassword);
+
+		// only if the confirm pass word and password match will the record be added.
+		if (password == confirmPassword)
 		{
-			Record& r = vRecords[i];
-			r.id = to_string(i + 1);
+			isValidPassword = true;
+
+			Record rec;
+			rec.description = description;
+			rec.user = username;
+			rec.pass = password;
+
+			vRecords.push_back(rec);
+
+			for (unsigned i = 0; i < vRecords.size(); i++)
+			{
+				Record& r = vRecords[i];
+				r.id = to_string(i + 1);
+			}
+		}
+		else
+		{
+			isValidPassword = false;
+			cout << "Passwords Do Not Match!\n";
 		}
 	}
-	DisplayRecords(vRecords);
+	MainMenu(vRecords);
+	//DisplayRecords(vRecords);
 }
 
-void DeleteRecord(vector<Record>& vRecords)
+void DeleteRecord(vector<Record> & vRecords)
 {
+	system("cls");
+	Title();
+	DeleteRecordBanner();
+	DisplayRecords(vRecords);
+
 	string searchString;
 	string check;
 	bool recordExists = false;
-
-	cout << "=======================================================================================================================\n";
-	cout << "|                                                 Delete Record                                                       |\n";
-	cout << "=======================================================================================================================\n";
 
 	while (!recordExists)
 	{
 		cout << "Select a record to delete: ";
 		getline(cin, searchString);
+
+		if (searchString == "c")
+		{
+			MainMenu(vRecords);
+		}
 
 		for (unsigned i = 0; i < vRecords.size(); ++i)
 		{
@@ -227,7 +381,7 @@ void DeleteRecord(vector<Record>& vRecords)
 		r.id = to_string(i + 1);
 	}
 
-	DisplayRecords(vRecords);
+	MainMenu(vRecords);
 }
 
 string GetInput()
@@ -240,9 +394,13 @@ string GetInput()
 	return s;
 }
 
-void MainMenu(vector<Record> &vRecords) {
+void MainMenu(vector<Record> & vRecords) {
 
-	//system("cls");
+	system("cls");
+	Title();
+	RecordsBanner();
+	DisplayRecords(vRecords);
+
 	struct MenuAction {
 
 		string description;
@@ -255,7 +413,8 @@ void MainMenu(vector<Record> &vRecords) {
 		{ "2",{ "Add Record", [&]() { AddRecord(vRecords); } } },
 		{ "3",{ "Edit Record", [&]() { EditRecord(vRecords); } } },
 		{ "4",{ "Delete Record", [&]() { DeleteRecord(vRecords); } } },
-		{ "q",{ "Quit", [&]() { UpdateDatabase(vRecords); } } }
+		{ "s",{ "Save and Exit", [&]() { UpdateDatabase(vRecords); Krypt(); exit(0); } } },
+		{ "q",{ "Quit", []() { exit(0); } } }
 	};
 
 	for (auto const& x : actionTable) {
@@ -272,7 +431,7 @@ void MainMenu(vector<Record> &vRecords) {
 	actionTable.at(input).action();
 }
 
-void PopulateVector(vector<Record> &vRecords)
+void PopulateVector(vector<Record> & vRecords)
 {
 	ifstream inFile("database.txt");
 	string entry;
@@ -283,7 +442,7 @@ void PopulateVector(vector<Record> &vRecords)
 
 		Record rec;
 		getline(iss, rec.id, '\t');
-		getline(iss, rec.site, '\t');
+		getline(iss, rec.description, '\t');
 		getline(iss, rec.user, '\t');
 		getline(iss, rec.pass, '\t');
 
@@ -301,12 +460,14 @@ string GetHash()
 	return hash;
 }
 
-void PromptForMasterPassword(string &hash)
+void PromptForMasterPassword(string & hash)
 {
+	system("cls");
+	Title();
 	bool isAuthenticated = false;
 	string masterPassword;
 
-	cout << "Enter Master Password to unlock database.\n";
+	//cout << "Enter Master Password to unlock database.\n";
 
 	while (!isAuthenticated)
 	{
@@ -318,19 +479,20 @@ void PromptForMasterPassword(string &hash)
 		if (sha256(masterPassword) == hash)
 		{
 			isAuthenticated = true;
-			cout << "Access Granted!\n";
-		}
-		else
-		{
-			cout << "Access Denied!\n";
 		}
 	}
 }
 
-void WriteHashToKeyFile(string &key)
+void WriteHashToKeyFile(string & key)
 {
 	SHA256 sha256;
 	ofstream outFile("key.txt");
+	wchar_t* fileLPCWSTR = L"key.txt";
+
+	int attr = GetFileAttributes(fileLPCWSTR);
+	if ((attr & FILE_ATTRIBUTE_HIDDEN) == 0) {
+		SetFileAttributes(fileLPCWSTR, attr | FILE_ATTRIBUTE_HIDDEN);
+	}
 	outFile << sha256(key);
 }
 
@@ -355,7 +517,7 @@ string CreateMasterPassword()
 		else if (masterPassword == confirmMasterPassword)
 		{
 			isValidPassword = true;
-			cout << "Master Password has been created. Store this in a safe location.\n";
+			cout << "\nMaster Password has been created. Store this in a safe location.\n";
 		}
 		else
 		{
@@ -367,9 +529,33 @@ string CreateMasterPassword()
 	return masterPassword;
 }
 
-/*
-	if key.txt exists return false
-*/
+void Krypt()
+{
+	ifstream inFile;
+	ofstream outFile;
+
+	char fileName[] = "database.txt";
+	char renamedFile[] = "database.old";
+	string key = "KryptKeeper5000!";
+
+	inFile.open(fileName, ios::in | ios::binary);
+	string str((istreambuf_iterator<char>(inFile)), istreambuf_iterator<char>());
+	inFile.close();
+
+	for (unsigned i = 0; i < str.size(); i++)
+	{
+		str[i] ^= key[i % key.size()];
+	}
+
+	if (rename(fileName, renamedFile) == 0)
+	{
+		outFile.open(fileName, ios::out | ios::binary);
+		outFile.write(str.c_str(), str.size());
+		remove(renamedFile);
+	}
+}
+
+// if key.txt exists return false
 bool isFirstRun()
 {
 	bool result = true;
@@ -383,7 +569,8 @@ bool isFirstRun()
 	return result;
 }
 
-void ResizeEntry(string &entry, int colWidth) {
+// simple formatting
+void ResizeEntry(string & entry, int colWidth) {
 
 	unsigned allowedStringSize = (colWidth - 5);
 	unsigned actualStringSize = (entry).size();
@@ -395,41 +582,44 @@ void ResizeEntry(string &entry, int colWidth) {
 	}
 }
 
-void DisplayRecords(vector<Record> &vRecords)
+void DisplayRecords(vector<Record> & vRecords)
 {
-	//system("cls");
-
-	cout << "=======================================================================================================================\n";
-	cout << "|                                                      Records                                                        |\n";
-	cout << "=======================================================================================================================\n";
+	cout << right << "| " << setw(3) << "#" << left << setw(3) << " |"
+		<< setw(25) << "Description"
+		<< setw(40) << "UserName"
+		<< setw(44) << "Password" << " |"
+		<< "\n" << string(119, '-') << "\n";
 
 	if (vRecords.size() == 0)
 	{
-		cout << "\n" << string(45, ' ') << "NO RECORDS TO DISPLAY\n\n";
+		cout << "\n" << string(48, ' ') << "NO RECORDS TO DISPLAY\n\n";
+
 		FirstRunMenu(vRecords);
 	}
+
 	else
 	{
 		for (unsigned i = 0; i < vRecords.size(); ++i)
 		{
-			Record &rec = vRecords[i];
-			ResizeEntry(rec.site, 25);
+			Record& rec = vRecords[i];
+			ResizeEntry(rec.description, 25);
 			ResizeEntry(rec.user, 40);
 			ResizeEntry(rec.pass, 40);
 
 			cout << right << "| " << setw(3) << rec.id << left << setw(3) << " |"
-				<< setw(25) << rec.site
+				<< setw(25) << rec.description
 				<< setw(40) << rec.user
 				<< setw(44) << string(20, '*') << " |"
-				<< "\n-----------------------------------------------------------------------------------------------------------------------\n";
+				<< "\n" << string(119, '-') << "\n";
 		}
-
-		MainMenu(vRecords);
 	}
 }
 
-void FirstRunMenu(vector<Record> &vRecords)
+void FirstRunMenu(vector<Record> & vRecords)
 {
+	system("cls");
+	Title();
+
 	struct FirstRunMenuAction {
 
 		string description;
@@ -439,7 +629,7 @@ void FirstRunMenu(vector<Record> &vRecords)
 	const map <string, FirstRunMenuAction> FirstRunMenuTable{
 
 		{ "1",{ "Add Record", [&]() { AddRecord(vRecords); } } },
-		{ "q",{ "Quit", []() { cout << "Quit" << "\n";  } } }
+		{ "q",{ "Quit", []() { exit(0); } } }
 	};
 
 	for (auto const& x : FirstRunMenuTable) {
@@ -455,21 +645,117 @@ void FirstRunMenu(vector<Record> &vRecords)
 	FirstRunMenuTable.at(input).action();
 }
 
+void UpdateDatabase(vector<Record> & vRecords)
+{
+	char fileName[] = "database.txt";
 
+	remove(fileName);
 
-
-void UpdateDatabase(vector<Record> &vRecords)
-{	
 	ofstream outFile;
 	outFile.open("database.txt", ios_base::app);
-	
+
+	wchar_t* fileLPCWSTR = L"database.txt";
+
+	int attr = GetFileAttributes(fileLPCWSTR);
+	if ((attr & FILE_ATTRIBUTE_HIDDEN) == 0) {
+		SetFileAttributes(fileLPCWSTR, attr | FILE_ATTRIBUTE_HIDDEN);
+	}
 
 	for (unsigned i = 0; i < vRecords.size(); ++i)
 	{
-		Record &rec = vRecords[i];
-		outFile << rec.id << "\t" << rec.site << "\t" << rec.user << "\t" << rec.pass << "\n";
+		Record& rec = vRecords[i];
+
+		outFile << rec.id << "\t" << rec.description << "\t" << rec.user << "\t" << rec.pass << "\n";
 	}
 }
+
+char GenRand()
+{
+	int strLen = sizeof(alphnum) - 1;
+	return alphnum[rand() % strLen];
+}
+
+string GenPassword()
+{
+	int n, c = 0, s = 0;
+	string password;
+	srand(time(0));
+	cout << "Enter the length of the password required:";
+	cin >> n;
+	cin.ignore();
+
+	char C;
+
+	for (int z = 0; z < n; z++)
+	{
+		C = GenRand();
+		password += C;
+		if (isdigit(C))
+		{
+			c++;
+		}
+		if (C == '!' || C == '@' || C == '$' || C == '%' || C == '^' || C == '&' || C == '*' || C == '#')
+		{
+			s++;
+		}
+	}
+
+	return password;
+}
+
+void DeleteRecordBanner()
+{
+	cout << string(119, '=') << "\n";
+	cout << "|" << string(52, ' ') << "Delete Record" << string(52, ' ') << "|" << "\n";
+	cout << string(119, '=') << "\n";
+}
+
+void AddRecordBanner()
+{
+	cout << string(119, '=') << "\n";
+	cout << "|" << string(53, ' ') << "Add Record" << string(54, ' ') << "|" << "\n";
+	cout << string(119, '=') << "\n";
+}
+
+void ViewRecordBanner()
+{
+	cout << string(119, '=') << "\n";
+	cout << "|" << string(53, ' ') << "View Record" << string(53, ' ') << "|" << "\n";
+	cout << string(119, '=') << "\n";
+}
+
+void EditRecordsBanner()
+{
+	cout << string(119, '=') << "\n";
+	cout << "|" << string(53, ' ') << "Edit Record" << string(53, ' ') << "|" << "\n";
+	cout << string(119, '=') << "\n";
+}
+
+void RecordsBanner()
+{
+	cout << string(119, '=') << "\n";
+	cout << "|" << string(55, ' ') << "Records" << string(55, ' ') << "|" << "\n";
+	cout << string(119, '=') << "\n";
+}
+
+bool databaseExists()
+{
+	bool result = false;
+	ifstream inFile("database.txt");
+
+	if (inFile)
+	{
+		result = true;
+	}
+
+	return result;
+}
+
+void Title()
+{
+	cout << "\n" << string(54, ' ') << "KryptKeeper" << string(54, ' ') << "\n\n";
+}
+
 
 /*
 
